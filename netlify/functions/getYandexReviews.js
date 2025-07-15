@@ -1,18 +1,16 @@
 /*
  * Это бессерверная функция (Serverless Function).
- * Она будет работать на вашем хостинге и безопасно получать данные от Яндекса.
- * В эту версию добавлена улучшенная диагностика для поиска ошибки.
+ * В этой версии используется другой HTTP-клиент (axios) для обхода сетевых проблем.
  */
-const fetch = require('node-fetch');
+const axios = require('axios');
 
 exports.handler = async function(event, context) {
-  console.log("--- Запуск функции ---");
+  console.log("--- Запуск функции с axios ---");
 
   const orgId = '198259889276';
   const reviewsCount = 8;
   const oauthToken = process.env.YANDEX_OAUTH_TOKEN;
 
-  // Шаг 1: Проверяем, что токен доступен
   if (!oauthToken) {
     console.error("ОШИБКА: Переменная YANDEX_OAUTH_TOKEN не найдена!");
     return {
@@ -22,38 +20,22 @@ exports.handler = async function(event, context) {
   }
   console.log("Токен найден. Первые 4 символа:", oauthToken.substring(0, 4) + "...");
 
-  // Шаг 2: Формируем URL
   const apiUrl = `https://api.business.yandex.com/v1/chain-main/organizations/${orgId}/reviews?take=${reviewsCount}&sort=by_time`;
   console.log("Запрос к API по адресу:", apiUrl);
 
   try {
-    // Шаг 3: Выполняем запрос
-    const response = await fetch(apiUrl, {
-      method: 'GET',
+    const response = await axios.get(apiUrl, {
       headers: {
         'Authorization': `OAuth ${oauthToken}`,
         'Accept': 'application/json',
-        'User-Agent': 'NetlifyFunction/1.0' // Добавим User-Agent на всякий случай
+        'User-Agent': 'NetlifyFunction/1.0 (axios)'
       }
     });
 
     console.log(`Ответ от Яндекса получен. Статус: ${response.status} ${response.statusText}`);
 
-    // Шаг 4: Проверяем, успешен ли ответ
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error("ОШИБКА от API Яндекса:", errorBody);
-      return {
-        statusCode: response.status,
-        body: JSON.stringify({ 
-          message: `Ошибка от API Яндекса: ${response.statusText}`,
-          details: errorBody 
-        })
-      };
-    }
-
-    // Шаг 5: Если все хорошо, парсим и отправляем данные
-    const data = await response.json();
+    // У axios данные находятся в response.data
+    const data = response.data;
     console.log("Данные успешно получены и отправлены на сайт.");
     
     return {
@@ -66,18 +48,12 @@ exports.handler = async function(event, context) {
     };
 
   } catch (error) {
-    // Шаг 6: Ловим самые критические ошибки (например, проблемы с сетью)
-    console.error("КРИТИЧЕСКАЯ ОШИБКА:", error);
+    console.error("КРИТИЧЕСКАЯ ОШИБКА:", error.toJSON ? error.toJSON() : error);
     return {
-      statusCode: 500,
+      statusCode: error.response ? error.response.status : 500,
       body: JSON.stringify({ 
         message: `Внутренняя ошибка сервера при выполнении запроса.`,
-        error_details: {
-            name: error.name,
-            message: error.message,
-            code: error.code,
-            errno: error.errno
-        }
+        error_details: error.message
       })
     };
   }
