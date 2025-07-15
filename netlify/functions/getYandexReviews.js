@@ -18,7 +18,8 @@ exports.handler = async function(event, context) {
     };
   }
 
-  const apiUrl = `https://api.business.yandex.ru/v1/chain-main/organizations/${orgId}/reviews?take=${reviewsCount}&sort=by_time`;
+  // --- ИСПРАВЛЕНИЕ ЗДЕСЬ: .ru заменен на .com ---
+  const apiUrl = `https://api.business.yandex.com/v1/chain-main/organizations/${orgId}/reviews?take=${reviewsCount}&sort=by_time`;
 
   try {
     const response = await fetch(apiUrl, {
